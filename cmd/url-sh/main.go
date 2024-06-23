@@ -4,6 +4,7 @@ import (
     "log/slog"
     "os"
     "url-sh/internal/config"
+    "url-sh/internal/storage/sqlite"
 )
 
 const (
@@ -19,6 +20,15 @@ func main() {
 
     log.Info("Starting server", slog.String("env", cfg.Env))
     log.Debug("Debug messages are enabled")
+
+    storage, err := sqlite.New(cfg.StoragePath)
+
+    if err != nil {
+        log.Error("Failed to initialise db", err)
+        os.Exit(1)
+    }
+
+    _ = storage
 
 }
 
