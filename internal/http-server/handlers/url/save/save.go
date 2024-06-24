@@ -8,6 +8,8 @@ import (
     "log/slog"
     "net/http"
     "url-sh/internal/lib/api/responce"
+    "url-sh/internal/lib/random"
+    "url-sh/internal/storage"
 )
 
 type Request struct {
@@ -20,11 +22,13 @@ type Responce struct {
     Alias string `json:"alias,omitempty"`
 }
 
+// TODO: mock func
+
 type URLSaver interface {
     SaveURL(urlToSave string, alias string) (int64, error)
 }
 
-func New(log *slog.Logger, urlSaver URLSaver) http.HandlerFunc {
+func New(log *slog.Logger, urlSaver URLSaver, aliasLength int) http.HandlerFunc {
     return func(w http.ResponseWriter, r *http.Request) {
         const op = "handlers.url.save.New"
 
@@ -57,7 +61,31 @@ func New(log *slog.Logger, urlSaver URLSaver) http.HandlerFunc {
             return
         }
 
-        // TODO: Alias logics
+        alias := req.Alias
+        if alias == "" {
+            //TODO: Check for repeats
+            alias = random.NewRandomString(aliasLength)
+        }
+
+        id, err := urlSaver.SaveURL(req.URL, alias)
+        if errors.Is(err, storage.ErrURLExists) {
+            log.Info("url alredy exists", slog.String("url", req.URL))
+
+            render.JSON(w, r, responce.Error("url already exists"))
+
+            return
+        }
+
+        slog.Info("url added successfully", slog.Int64("id", id))
+
+        responceOK(w, r, alias)
 
     }
+}
+
+func responceOK(w http.ResponseWriter, r *http.Request, alias string) {
+    render.JSON(w, r, Responce{
+        Responce: responce.OK(),
+        Alias:    alias,
+    })
 }
