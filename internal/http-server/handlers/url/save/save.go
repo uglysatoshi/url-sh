@@ -1,91 +1,91 @@
 package save
 
 import (
-    "errors"
-    "github.com/go-chi/chi/v5/middleware"
-    "github.com/go-chi/render"
-    "github.com/go-playground/validator/v10"
-    "log/slog"
-    "net/http"
-    "url-sh/internal/lib/api/responce"
-    "url-sh/internal/lib/random"
-    "url-sh/internal/storage"
+	"errors"
+	"github.com/go-chi/chi/v5/middleware"
+	"github.com/go-chi/render"
+	"github.com/go-playground/validator/v10"
+	"log/slog"
+	"net/http"
+	"url-sh/internal/lib/api/responce"
+	"url-sh/internal/lib/random"
+	"url-sh/internal/storage"
 )
 
 type Request struct {
-    URL   string `json:"url" validate:"required,url"`
-    Alias string `json:"alias,omitempty"`
+	URL   string `json:"url" validate:"required,url"`
+	Alias string `json:"alias,omitempty"`
 }
 
 type Responce struct {
-    responce.Responce
-    Alias string `json:"alias,omitempty"`
+	responce.Responce
+	Alias string `json:"alias,omitempty"`
 }
 
 // TODO: mock func
 
 type URLSaver interface {
-    SaveURL(urlToSave string, alias string) (int64, error)
+	SaveURL(urlToSave string, alias string) (int64, error)
 }
 
 func New(log *slog.Logger, urlSaver URLSaver, aliasLength int) http.HandlerFunc {
-    return func(w http.ResponseWriter, r *http.Request) {
-        const op = "handlers.url.save.New"
+	return func(w http.ResponseWriter, r *http.Request) {
+		const op = "handlers.url.save.New"
 
-        log = log.With(
-            slog.String("op", op),
-            slog.String("request_id", middleware.GetReqID(r.Context())),
-        )
+		log = log.With(
+			slog.String("op", op),
+			slog.String("request_id", middleware.GetReqID(r.Context())),
+		)
 
-        var req Request
+		var req Request
 
-        err := render.DecodeJSON(r.Body, &req)
-        if err != nil {
-            log.Error("failed to decode request body", err)
+		err := render.DecodeJSON(r.Body, &req)
+		if err != nil {
+			log.Error("failed to decode request body", err)
 
-            render.JSON(w, r, responce.Error("failed to decode request"))
+			render.JSON(w, r, responce.Error("failed to decode request"))
 
-            return
-        }
+			return
+		}
 
-        log.Info("request body decoded", slog.Any("request", req))
+		log.Info("request body decoded", slog.Any("request", req))
 
-        if err := validator.New().Struct(req); err != nil {
-            var validateErr validator.ValidationErrors
-            errors.As(err, &validateErr)
+		if err := validator.New().Struct(req); err != nil {
+			var validateErr validator.ValidationErrors
+			errors.As(err, &validateErr)
 
-            log.Error("invalid request", err)
+			log.Error("invalid request", err)
 
-            render.JSON(w, r, responce.ValidationError(validateErr))
+			render.JSON(w, r, responce.ValidationError(validateErr))
 
-            return
-        }
+			return
+		}
 
-        alias := req.Alias
-        if alias == "" {
-            //TODO: Check for repeats
-            alias = random.NewRandomString(aliasLength)
-        }
+		alias := req.Alias
+		if alias == "" {
+			//TODO: Check for repeats
+			alias = random.NewRandomString(aliasLength)
+		}
 
-        id, err := urlSaver.SaveURL(req.URL, alias)
-        if errors.Is(err, storage.ErrURLExists) {
-            log.Info("url alredy exists", slog.String("url", req.URL))
+		id, err := urlSaver.SaveURL(req.URL, alias)
+		if errors.Is(err, storage.ErrURLExists) {
+			log.Info("url already exists", slog.String("url", req.URL))
 
-            render.JSON(w, r, responce.Error("url already exists"))
+			render.JSON(w, r, responce.Error("url already exists"))
 
-            return
-        }
+			return
+		}
 
-        slog.Info("url added successfully", slog.Int64("id", id))
+		slog.Info("url added successfully", slog.Int64("id", id))
 
-        responceOK(w, r, alias)
+		responceOK(w, r, alias)
 
-    }
+	}
 }
 
 func responceOK(w http.ResponseWriter, r *http.Request, alias string) {
-    render.JSON(w, r, Responce{
-        Responce: responce.OK(),
-        Alias:    alias,
-    })
+	render.JSON(w, r, Responce{
+		Responce: responce.OK(),
+		Alias:    alias,
+	})
 }
