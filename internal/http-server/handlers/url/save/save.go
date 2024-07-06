@@ -75,6 +75,14 @@ func New(log *slog.Logger, urlSaver URLSaver, aliasLength int) http.HandlerFunc 
 			return
 		}
 
+		if err != nil {
+			log.Error("failed to add url", err)
+
+			render.JSON(w, r, responce.Error("failed to add url"))
+
+			return
+		}
+
 		slog.Info("url added successfully", slog.Int64("id", id))
 
 		responceOK(w, r, alias)
