@@ -1,91 +1,100 @@
 package main
 
 import (
-    "github.com/go-chi/chi/v5"
-    "github.com/go-chi/chi/v5/middleware"
-    "log/slog"
-    "net/http"
-    "os"
-    "url-sh/internal/config"
-    "url-sh/internal/http-server/handlers/url/save"
-    "url-sh/internal/http-server/middleware/logger"
-    "url-sh/internal/lib/logger/handlers/slogpretty"
-    "url-sh/internal/storage/sqlite"
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
+	"log/slog"
+	"net/http"
+	"os"
+	"url-sh/internal/config"
+	"url-sh/internal/http-server/handlers/redirect"
+	"url-sh/internal/http-server/handlers/url/save"
+	"url-sh/internal/http-server/middleware/logger"
+	"url-sh/internal/lib/logger/handlers/slogpretty"
+	"url-sh/internal/storage/sqlite"
 )
 
 const (
-    envLocal = "local"
-    envProd  = "prod"
-    envDev   = "dev"
+	envLocal = "local"
+	envProd  = "prod"
+	envDev   = "dev"
 )
 
 func main() {
-    cfg := config.MustLoad()
+	cfg := config.MustLoad()
 
-    log := setupLogger(cfg.Env)
+	log := setupLogger(cfg.Env)
 
-    log.Info("Starting server", slog.String("env", cfg.Env))
-    log.Debug("Debug messages are enabled")
+	log.Info("Starting server", slog.String("env", cfg.Env))
+	log.Debug("Debug messages are enabled")
 
-    storage, err := sqlite.New(cfg.StoragePath)
+	storage, err := sqlite.New(cfg.StoragePath)
 
-    if err != nil {
-        log.Error("Failed to initialise db", err)
-        os.Exit(1)
-    }
+	if err != nil {
+		log.Error("Failed to initialise db", err)
+		os.Exit(1)
+	}
 
-    _ = storage
+	router := chi.NewRouter()
+	router.Use(middleware.RequestID)
+	router.Use(middleware.RealIP)
+	router.Use(middleware.Logger)
+	router.Use(logger.New(log))
+	router.Use(middleware.Recoverer)
+	router.Use(middleware.URLFormat)
 
-    router := chi.NewRouter()
-    router.Use(middleware.RequestID)
-    router.Use(middleware.RealIP)
-    router.Use(middleware.Logger)
-    router.Use(logger.New(log))
-    router.Use(middleware.Recoverer)
-    router.Use(middleware.URLFormat)
+	router.Route("/url", func(r chi.Router) {
+		r.Use(middleware.BasicAuth("url-sh", map[string]string{
+			cfg.HTTPServer.User: cfg.HTTPServer.Password,
+		}))
 
-    router.Post("/url", save.New(log, storage, cfg.AliasLength))
+		r.Post("/", save.New(log, storage, cfg.AliasLength))
 
-    log.Info("Starting server", slog.String("address", cfg.Address))
+		// TODO: add DELETE opt
 
-    srv := &http.Server{
-        Addr:         cfg.Address,
-        Handler:      router,
-        ReadTimeout:  cfg.Timeout,
-        WriteTimeout: cfg.Timeout,
-        IdleTimeout:  cfg.IdleTimeout,
-    }
+	})
+	router.Get("/{alias}", redirect.New(log, storage))
 
-    if err := srv.ListenAndServe(); err != nil {
-        log.Error("Failed to start server")
-    }
+	log.Info("Starting server", slog.String("address", cfg.Address))
 
-    log.Error("Server stopped")
+	srv := &http.Server{
+		Addr:         cfg.Address,
+		Handler:      router,
+		ReadTimeout:  cfg.Timeout,
+		WriteTimeout: cfg.Timeout,
+		IdleTimeout:  cfg.IdleTimeout,
+	}
+
+	if err := srv.ListenAndServe(); err != nil {
+		log.Error("Failed to start server")
+	}
+
+	log.Error("Server stopped")
 
 }
 
 func setupLogger(env string) *slog.Logger {
-    var log *slog.Logger
-    switch env {
-    case envLocal:
-        log = setupPrettySlog()
-    case envDev:
-        log = slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug}))
-    case envProd:
-        log = slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
-    }
+	var log *slog.Logger
+	switch env {
+	case envLocal:
+		log = setupPrettySlog()
+	case envDev:
+		log = slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	case envProd:
+		log = slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
+	}
 
-    return log
+	return log
 }
 
 func setupPrettySlog() *slog.Logger {
-    opts := slogpretty.PrettyHandlerOptions{
-        SlogOpts: &slog.HandlerOptions{
-            Level: slog.LevelDebug,
-        },
-    }
+	opts := slogpretty.PrettyHandlerOptions{
+		SlogOpts: &slog.HandlerOptions{
+			Level: slog.LevelDebug,
+		},
+	}
 
-    handler := opts.NewPrettyHandler(os.Stdout)
+	handler := opts.NewPrettyHandler(os.Stdout)
 
-    return slog.New(handler)
+	return slog.New(handler)
 }
