@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/jeffry-luqman/zlog"
 	"log/slog"
 	"net/http"
 	"os"
@@ -77,11 +78,29 @@ func setupLogger(env string) *slog.Logger {
 	var log *slog.Logger
 	switch env {
 	case envLocal:
-		log = setupPrettySlog()
+		{
+			zlog.HandlerOptions = &slog.HandlerOptions{Level: slog.LevelDebug}
+			zlog.FmtDuration = []int{zlog.FgMagenta, zlog.FmtItalic}
+			zlog.FmtPath = []int{zlog.FgHiCyan}
+			log = zlog.New()
+		}
+
 	case envDev:
-		log = slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug}))
+		{
+			zlog.HandlerOptions = &slog.HandlerOptions{Level: slog.LevelDebug}
+			zlog.FmtDuration = []int{zlog.FgMagenta, zlog.FmtItalic}
+			zlog.FmtPath = []int{zlog.FgHiCyan}
+			log = zlog.New()
+		}
+
 	case envProd:
-		log = slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
+		{
+			zlog.HandlerOptions = &slog.HandlerOptions{Level: slog.LevelInfo}
+			zlog.FmtDuration = []int{zlog.FgMagenta, zlog.FmtItalic}
+			zlog.FmtPath = []int{zlog.FgHiCyan}
+			log = zlog.New()
+		}
+
 	}
 
 	return log
