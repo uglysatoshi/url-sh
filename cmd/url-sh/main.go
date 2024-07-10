@@ -11,7 +11,6 @@ import (
 	"url-sh/internal/http-server/handlers/redirect"
 	"url-sh/internal/http-server/handlers/url/save"
 	"url-sh/internal/http-server/middleware/logger"
-	"url-sh/internal/lib/logger/handlers/slogpretty"
 	"url-sh/internal/storage/sqlite"
 )
 
@@ -104,16 +103,4 @@ func setupLogger(env string) *slog.Logger {
 	}
 
 	return log
-}
-
-func setupPrettySlog() *slog.Logger {
-	opts := slogpretty.PrettyHandlerOptions{
-		SlogOpts: &slog.HandlerOptions{
-			Level: slog.LevelDebug,
-		},
-	}
-
-	handler := opts.NewPrettyHandler(os.Stdout)
-
-	return slog.New(handler)
 }
