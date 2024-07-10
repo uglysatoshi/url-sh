@@ -86,18 +86,12 @@ func setupLogger(env string) *slog.Logger {
 
 	case envDev:
 		{
-			zlog.HandlerOptions = &slog.HandlerOptions{Level: slog.LevelDebug}
-			zlog.FmtDuration = []int{zlog.FgMagenta, zlog.FmtItalic}
-			zlog.FmtPath = []int{zlog.FgHiCyan}
-			log = zlog.New()
+			log = slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug}))
 		}
 
 	case envProd:
 		{
-			zlog.HandlerOptions = &slog.HandlerOptions{Level: slog.LevelInfo}
-			zlog.FmtDuration = []int{zlog.FgMagenta, zlog.FmtItalic}
-			zlog.FmtPath = []int{zlog.FgHiCyan}
-			log = zlog.New()
+			log = slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
 		}
 
 	}
